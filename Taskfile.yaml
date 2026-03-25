@@ -1,0 +1,17 @@
+version: "3"
+
+vars:
+    APP: chainer
+
+tasks:
+    build:
+        cmds:
+            - go build -o bin/{{.APP}}
+
+    run:
+        cmds:
+            - ./bin/{{.APP}}
+
+    test:
+        cmds:
+            - go test -v ./...
