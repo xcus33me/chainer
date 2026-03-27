@@ -1,9 +1,9 @@
 package core
 
 import (
-	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/xcus33me/chainer/crypto"
 	"github.com/xcus33me/chainer/proto"
 	"github.com/xcus33me/chainer/utils"
@@ -24,7 +24,7 @@ func TestNewTransaction(t *testing.T) {
 	input := &proto.TxInput{
 		PrevTxHash: utils.RandomHash(),
 		PrevOutIdx: 0,
-		PublicKey:  toPrivKey.Public().Bytes(),
+		PublicKey:  fromPrivKey.Public().Bytes(),
 	}
 
 	output1 := &proto.TxOutput{
@@ -46,5 +46,5 @@ func TestNewTransaction(t *testing.T) {
 	sig := SignTransaction(fromPrivKey, tx)
 	input.Signature = sig.Bytes()
 
-	fmt.Printf("%+v\n", tx)
+	assert.True(t, VerifyTransaction(tx))
 }
