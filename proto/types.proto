@@ -8,13 +8,30 @@ message Block {
 }
 
 message Header {
-    int32 version = 1;
-    int32 height = 2;       // block id
-    bytes prevHash = 3;     // hash of prev block
-    bytes rootHash = 4;     // merkle root of txs
-    int64 timestamp = 5;    // when block was created
+	int32 version = 1;
+  int32 height = 2;       // block id
+  bytes prevHash = 3;     // hash of prev block
+  bytes rootHash = 4;     // merkle root of txs
+  int64 timestamp = 5;    // when block was created
+}
+
+message TxInput {
+	// the prev hash of the transaction containing the output we want to spend
+	bytes prevTxHash = 1;
+	// The index of the output of the prev transaction we want to spend
+	uint32 prevOutIdx = 2;
+
+	bytes publicKey = 3;
+	bytes signature = 4;
+}
+
+message TxOutput {
+	int64 amount = 1;
+	bytes address = 2;
 }
 
 message Transaction {
-    
+  int32 version = 1;
+	repeated TxInput inputs = 2;
+	repeated TxOutput outputs = 3;
 }
