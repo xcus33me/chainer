@@ -13,7 +13,22 @@ func SignTransaction(pk *crypto.PrivateKey, tx *proto.Transaction) *crypto.Signa
 }
 
 func HashTransaction(tx *proto.Transaction) []byte {
-	b, err := pb.Marshal(tx)
+	txCopy := &proto.Transaction{
+		Version: tx.Version,
+		Inputs:  make([]*proto.TxInput, len(tx.Inputs)),
+		Outputs: tx.Outputs,
+	}
+
+	for i, input := range tx.Inputs {
+		txCopy.Inputs[i] = &proto.TxInput{
+			PrevTxHash: input.PrevTxHash,
+			PrevOutIdx: input.PrevOutIdx,
+			PublicKey:  input.PublicKey,
+			// Do not copy signature
+		}
+	}
+
+	b, err := pb.Marshal(txCopy)
 	if err != nil {
 		panic(err)
 	}
@@ -23,17 +38,19 @@ func HashTransaction(tx *proto.Transaction) []byte {
 }
 
 func VerifyTransaction(tx *proto.Transaction) bool {
+	txHash := HashTransaction(tx)
 	for _, input := range tx.Inputs {
-		sig := crypto.SignatureFromBytes(input.Signature)
-		pubKey := crypto.PublicKeyFromBytes(input.PublicKey)
+		sig, err := crypto.SignatureFromBytes(input.Signature)
+		if err != nil {
+			return false
+		}
 
-		// We should make signature nil because we dont have it for now
-		savedSig := input.Signature
-		input.Signature = nil
-		valid := sig.Verify(pubKey, HashTransaction(tx))
-		input.Signature = savedSig
+		pubKey, err := crypto.PublicKeyFromBytes(input.PublicKey)
+		if err != nil {
+			return false
+		}
 
-		if !valid {
+		if !sig.Verify(pubKey, txHash) {
 			return false
 		}
 	}

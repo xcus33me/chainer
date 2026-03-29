@@ -1,8 +1,6 @@
 package core
 
 import (
-	"encoding/hex"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -25,6 +23,5 @@ func TestSignBlock(t *testing.T) {
 func TestHashBlock(t *testing.T) {
 	block := utils.RandomBlock()
 	hash := HashBlock(block)
-	fmt.Println(hex.EncodeToString(hash))
 	assert.Equal(t, len(hash), 32)
 }
