@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"io"
 )
 
@@ -72,14 +73,14 @@ type PublicKey struct {
 	key ed25519.PublicKey
 }
 
-func PublicKeyFromBytes(b []byte) *PublicKey {
+func PublicKeyFromBytes(b []byte) (*PublicKey, error) {
 	if len(b) != publicKeyLen {
-		panic("invalid public key length")
+		return nil, fmt.Errorf("invalid public key length")
 	}
 
 	return &PublicKey{
 		key: ed25519.PublicKey(b),
-	}
+	}, nil
 }
 
 func (p *PublicKey) Address() Address {
@@ -96,13 +97,13 @@ type Signature struct {
 	value []byte
 }
 
-func SignatureFromBytes(b []byte) *Signature {
+func SignatureFromBytes(b []byte) (*Signature, error) {
 	if len(b) != signatureLen {
-		panic("invalid signature len")
+		return nil, fmt.Errorf("invalid signature length")
 	}
 	return &Signature{
 		value: b,
-	}
+	}, nil
 }
 
 func (s *Signature) Bytes() []byte {
