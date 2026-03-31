@@ -3,12 +3,16 @@ syntax = "proto3";
 option go_package = "github.com/xcus33me/chainer/proto";
 
 service Node {
-	rpc HandleTransaction(Transaction) returns (None);
+	rpc Handshake(Version) returns (Version);
+	rpc HandleTransaction(Transaction) returns (Ack);
 }
 
-message None {
-	
+message Version {
+	string version = 1;
+	int32 height = 2;
 }
+
+message Ack { }
 
 message Block {
 	Header header = 1;

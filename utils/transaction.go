@@ -19,8 +19,18 @@ func CreateTransaction() {
 
 	c := proto.NewNodeClient(client)
 
-	_, err = c.HandleTransaction(context.TODO(), &proto.Transaction{})
-	if err != nil {
-		slog.Error("utils - CreateTransaction", "err", err)
+	version := &proto.Version{
+		Version: "chainer-0.1",
+		Height:  0,
 	}
+
+	_, err = c.Handshake(context.TODO(), version)
+	if err != nil {
+		slog.Error("utils - CreateTransaction - c.Handshake", "err", err)
+	}
+
+	// _, err = c.HandleTransaction(context.TODO(), &proto.Transaction{})
+	// // if err != nil {
+	// // 	slog.Error("utils - CreateTransaction", "err", err)
+	// }
 }

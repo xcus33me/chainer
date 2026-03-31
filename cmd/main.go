@@ -29,7 +29,7 @@ func main() {
 
 	go func() {
 		for {
-			time.Sleep(2 * time.Second)
+			time.Sleep(time.Second)
 			utils.CreateTransaction()
 		}
 	}()
