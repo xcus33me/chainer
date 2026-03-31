@@ -11,12 +11,12 @@ import (
 type Node struct {
 	proto.UnimplementedNodeServer
 
-	verison string
+	version string
 }
 
 func NewNode() *Node {
 	return &Node{
-		verison: "chainer-0.1",
+		version: "chainer-0.1",
 	}
 }
 
@@ -28,7 +28,7 @@ func (n *Node) HandleTransaction(ctx context.Context, tx *proto.Transaction) (*p
 
 func (n *Node) Handshake(ctx context.Context, v *proto.Version) (*proto.Version, error) {
 	ourVersion := &proto.Version{
-		Version: n.verison,
+		Version: n.version,
 		Height:  0,
 	}
 
