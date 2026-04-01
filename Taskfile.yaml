@@ -17,7 +17,7 @@ tasks:
 
     run:
         cmds:
-            - ./bin/{{.APP}}
+            - go run cmd/main.go
 
     test:
         cmds:
