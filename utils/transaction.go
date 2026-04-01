@@ -11,7 +11,7 @@ import (
 )
 
 func CreateTransaction() {
-	client, err := grpc.NewClient(":3000", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	client, err := grpc.Dial(":3000", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		slog.Error("utils - CreateTransaction - grpc.NewClient", "err", err)
 		os.Exit(1)
@@ -20,8 +20,9 @@ func CreateTransaction() {
 	c := proto.NewNodeClient(client)
 
 	version := &proto.Version{
-		Version: "chainer-0.1",
-		Height:  0,
+		Version:    "chainer-0.1",
+		Height:     0,
+		ListenAddr: ":4000",
 	}
 
 	_, err = c.Handshake(context.TODO(), version)
