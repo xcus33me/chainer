@@ -1,37 +1,36 @@
 package main
 
 import (
-	"log/slog"
-	"net"
-	"os"
+	"context"
+	"log"
 	"time"
 
 	"github.com/xcus33me/chainer/node"
-	"github.com/xcus33me/chainer/proto"
-	"github.com/xcus33me/chainer/utils"
-	"google.golang.org/grpc"
 )
 
 func main() {
-	node := node.NewNode()
+	makeNode(":3000", []string{})
+	time.Sleep(1 * time.Second)
+	makeNode(":4000", []string{":3000"})
 
-	opts := []grpc.ServerOption{}
-	grpcServer := grpc.NewServer(opts...)
+	// go func() {
+	// 	for {
+	// 		time.Sleep(2 * time.Second)
+	// 		utils.CreateTransaction()
+	// 	}
+	// }()
+	select {}
+}
 
-	ln, err := net.Listen("tcp", ":3000")
-	if err != nil {
-		slog.Error("Failed to listen on :3000", "err", err)
-		os.Exit(1)
-	}
-	proto.RegisterNodeServer(grpcServer, node)
+func makeNode(listenAddr string, bootstrapNodes []string) *node.Node {
+	n := node.NewNode()
+	go n.Start(listenAddr)
 
-	slog.Info("node running on port :3000")
-
-	go func() {
-		for {
-			time.Sleep(time.Second)
-			utils.CreateTransaction()
+	if len(bootstrapNodes) >= 1 {
+		if err := n.BootstrapNetwork(context.Background(), bootstrapNodes); err != nil {
+			log.Fatal(err)
 		}
-	}()
-	grpcServer.Serve(ln)
+	}
+
+	return n
 }
