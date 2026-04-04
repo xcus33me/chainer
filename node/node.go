@@ -40,9 +40,15 @@ func (n *Node) addPeer(c proto.NodeClient, v *proto.Version) {
 	n.m.Lock()
 	defer n.m.Unlock()
 
-	n.logger.Debugw("new peer connected", "addr", v.ListenAddr, "height", v.Height)
-
 	n.peers[c] = v
+
+	for _, addr := range v.PeerList {
+		if addr != n.listenAddr {
+			n.logger.Debugf("[%s] need to connect with %s", n.listenAddr, addr)
+		}
+	}
+
+	n.logger.Debugw("new peer connected", "addr", v.ListenAddr, "height", v.Height)
 }
 
 func (n *Node) removePeer(c proto.NodeClient) {
@@ -96,8 +102,6 @@ func (n *Node) Handshake(ctx context.Context, v *proto.Version) (*proto.Version,
 
 	n.addPeer(c, v)
 
-	//slog.Info("received version from", "node_addr", p.Addr)
-
 	return n.getVersion(), nil
 }
 
@@ -112,7 +116,20 @@ func (n *Node) getVersion() *proto.Version {
 		Version:    "chainer-0.1",
 		Height:     0,
 		ListenAddr: n.listenAddr,
+		PeerList:   n.getPeerList(),
 	}
+}
+
+func (n *Node) getPeerList() []string {
+	n.m.RLock()
+	defer n.m.RUnlock()
+
+	peers := []string{}
+	for _, version := range n.peers {
+		peers = append(peers, version.ListenAddr)
+	}
+
+	return peers
 }
 
 func makeNodeClient(listenAddr string) (proto.NodeClient, error) {
