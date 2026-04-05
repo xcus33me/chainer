@@ -2,9 +2,13 @@ package node
 
 import (
 	"context"
+	"encoding/hex"
 	"net"
 	"sync"
+	"time"
 
+	"github.com/xcus33me/chainer/core"
+	"github.com/xcus33me/chainer/crypto"
 	"github.com/xcus33me/chainer/proto"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -12,32 +16,69 @@ import (
 	"google.golang.org/grpc/peer"
 )
 
+const (
+	blockTime = time.Second * 5
+)
+
+type Mempool struct {
+	txx map[string]*proto.Transaction
+}
+
+func NewMempool() *Mempool {
+	return &Mempool{
+		txx: make(map[string]*proto.Transaction),
+	}
+}
+
+func (p *Mempool) Has(tx *proto.Transaction) bool {
+	hash := hex.EncodeToString(core.HashTransaction(tx))
+	_, ok := p.txx[hash]
+	return ok
+}
+
+func (p *Mempool) Add(tx *proto.Transaction) bool {
+	if p.Has(tx) {
+		return false
+	}
+
+	hash := hex.EncodeToString(core.HashTransaction(tx))
+	p.txx[hash] = tx
+	return true
+}
+
+type ServerConfig struct {
+	Version    string
+	ListenAddr string
+	PrivateKey *crypto.PrivateKey
+}
+
 type Node struct {
 	proto.UnimplementedNodeServer
 
-	peers map[proto.NodeClient]*proto.Version
-	m     sync.RWMutex
+	ServerConfig
 
-	listenAddr string
-	version    string
+	mempool *Mempool
+	peers   map[proto.NodeClient]*proto.Version
+	m       sync.RWMutex
 
 	logger *zap.SugaredLogger
 }
 
-func NewNode() *Node {
+func NewNode(cfg ServerConfig) *Node {
 	loggerConfig := zap.NewDevelopmentConfig()
 	loggerConfig.EncoderConfig.TimeKey = ""
 	logger, _ := loggerConfig.Build()
 
 	return &Node{
-		peers:   make(map[proto.NodeClient]*proto.Version),
-		version: "chainer-0.1",
-		logger:  logger.Sugar(),
+		peers:        make(map[proto.NodeClient]*proto.Version),
+		logger:       logger.Sugar(),
+		mempool:      NewMempool(),
+		ServerConfig: cfg,
 	}
 }
 
 func (n *Node) Start(listenAddr string, bootstrapNodes []string) error {
-	n.listenAddr = listenAddr
+	n.ListenAddr = listenAddr
 
 	opts := []grpc.ServerOption{}
 	grpcServer := grpc.NewServer(opts...)
@@ -49,12 +90,16 @@ func (n *Node) Start(listenAddr string, bootstrapNodes []string) error {
 
 	proto.RegisterNodeServer(grpcServer, n)
 
-	n.logger.Infow("node running...", "port", n.listenAddr)
+	n.logger.Infow("node running...", "port", n.ListenAddr)
 
 	// bootstrap the network with a list of already known nodes
 	// in the network.
 	if len(bootstrapNodes) > 0 {
 		go n.bootstrapNetwork(context.Background(), bootstrapNodes)
+	}
+
+	if n.PrivateKey != nil {
+		go n.validatorLoop()
 	}
 
 	return grpcServer.Serve(ln)
@@ -73,8 +118,41 @@ func (n *Node) Handshake(ctx context.Context, v *proto.Version) (*proto.Version,
 
 func (n *Node) HandleTransaction(ctx context.Context, tx *proto.Transaction) (*proto.Ack, error) {
 	peer, _ := peer.FromContext(ctx)
-	n.logger.Debug("received tx from", peer.Addr)
+	hash := hex.EncodeToString(core.HashTransaction(tx))
+
+	if n.mempool.Add(tx) {
+		n.logger.Debugw("received tx", "we", n.ListenAddr, "from", peer.Addr, "hash", hash)
+		go func() {
+			if err := n.broadcast(tx); err != nil {
+				n.logger.Errorw("broadcast error", "err", err)
+			}
+		}()
+	}
+
 	return &proto.Ack{}, nil
+}
+
+func (n *Node) validatorLoop() {
+	n.logger.Infow("starting validator loop", "pubKey", n.PrivateKey.Public(), "blockTime", blockTime)
+	ticker := time.NewTicker(blockTime)
+
+	for {
+		<-ticker.C
+		n.logger.Debugw("time to create a new block", "txLen", len(n.mempool.txx))
+	}
+}
+
+func (n *Node) broadcast(msg any) error {
+	for peer := range n.peers {
+		switch v := msg.(type) {
+		case *proto.Transaction:
+			_, err := peer.HandleTransaction(context.Background(), v)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (n *Node) addPeer(ctx context.Context, c proto.NodeClient, v *proto.Version) {
@@ -91,7 +169,7 @@ func (n *Node) addPeer(ctx context.Context, c proto.NodeClient, v *proto.Version
 	}
 
 	n.logger.Debugw("new peer successfully connected",
-		"we", n.listenAddr, "remote", v.ListenAddr, "height", v.Height)
+		"we", n.ListenAddr, "remote", v.ListenAddr, "height", v.Height)
 }
 
 func (n *Node) removePeer(c proto.NodeClient) {
@@ -106,7 +184,7 @@ func (n *Node) bootstrapNetwork(ctx context.Context, addrs []string) error {
 			continue
 		}
 
-		n.logger.Debugw("dialing remote node", "we", n.listenAddr, "remote", addr)
+		n.logger.Debugw("dialing remote node", "we", n.ListenAddr, "remote", addr)
 
 		c, v, err := n.dialRemoteNode(ctx, addr)
 		if err != nil {
@@ -137,13 +215,13 @@ func (n *Node) getVersion() *proto.Version {
 	return &proto.Version{
 		Version:    "chainer-0.1",
 		Height:     0,
-		ListenAddr: n.listenAddr,
+		ListenAddr: n.ListenAddr,
 		PeerList:   n.getPeerList(),
 	}
 }
 
 func (n *Node) canConnectWith(addr string) bool {
-	if n.listenAddr == addr {
+	if n.ListenAddr == addr {
 		return false
 	}
 
