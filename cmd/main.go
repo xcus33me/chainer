@@ -23,7 +23,7 @@ func main() {
 	time.Sleep(time.Second)
 
 	for {
-		time.Sleep(time.Second * 2)
+		time.Sleep(time.Millisecond * 100)
 		makeTransaction()
 	}
 	// select {}
